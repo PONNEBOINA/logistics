@@ -31,10 +31,13 @@ export interface Booking {
   customer_id: string;
   driver_id: string | null;
   vehicle_id: string | null;
-  pickup_location: { lat: number; lng: number; address?: string };
-  drop_location: { lat: number; lng: number; address?: string };
+  pickup_location: { lat: number; lng: number };
+  pickup_address: string | null;
+  drop_location: { lat: number; lng: number };
+  drop_address: string | null;
   distance: number | null;
   status: BookingStatus;
+  confirmed_at: string | null;
   created_at: string;
   updated_at: string;
 }

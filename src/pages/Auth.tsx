@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/MongoAuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Truck, UserCircle, Package } from 'lucide-react';
+import { VEHICLE_TYPES, type VehicleType } from '@/constants/vehicleTypes';
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -15,6 +16,7 @@ const Auth = () => {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [role, setRole] = useState<'ADMIN' | 'DRIVER' | 'CUSTOMER'>('CUSTOMER');
+  const [vehicleType, setVehicleType] = useState<VehicleType | ''>('');
   const [loading, setLoading] = useState(false);
 
   const { signIn, signUp } = useAuth();
@@ -28,7 +30,11 @@ const Auth = () => {
       if (isLogin) {
         await signIn(email, password);
       } else {
-        await signUp(email, password, name, role);
+        // For drivers, vehicleType is required
+        if (role === 'DRIVER' && !vehicleType) {
+          throw new Error('Please select a vehicle type');
+        }
+        await signUp(email, password, name, role, vehicleType || undefined);
       }
       navigate('/');
     } catch (error) {
@@ -101,6 +107,27 @@ const Auth = () => {
                       </SelectContent>
                     </Select>
                   </div>
+
+                  {role === 'DRIVER' && (
+                    <div className="space-y-2">
+                      <Label htmlFor="vehicleType">Vehicle Type You Can Drive</Label>
+                      <Select value={vehicleType} onValueChange={(v) => setVehicleType(v as VehicleType)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select vehicle type" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-60">
+                          {VEHICLE_TYPES.map((type) => (
+                            <SelectItem key={type} value={type}>
+                              {type}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        Select the type of vehicle you are qualified to drive
+                      </p>
+                    </div>
+                  )}
                 </>
               )}
 
@@ -109,11 +136,14 @@ const Auth = () => {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="you@example.com"
+                  placeholder="admin@gmail.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
                 />
+                <p className="text-xs text-muted-foreground">
+                  Use a valid email format (e.g., user@gmail.com)
+                </p>
               </div>
 
               <div className="space-y-2">

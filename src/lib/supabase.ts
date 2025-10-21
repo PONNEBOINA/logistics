@@ -12,6 +12,7 @@ export interface Profile {
   name: string;
   role: UserRole;
   is_active: boolean;
+  approved?: boolean;
   created_at: string;
   updated_at: string;
 }

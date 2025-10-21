@@ -1,11 +1,11 @@
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/MongoAuthContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Truck, LogOut, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const Navbar = () => {
-  const { profile, signOut } = useAuth();
+  const { user, signOut } = useAuth();
   const navigate = useNavigate();
 
   const getRoleBadgeColor = (role: string) => {
@@ -41,15 +41,15 @@ const Navbar = () => {
           </div>
 
           <div className="flex items-center gap-4">
-            {profile && (
+            {user && (
               <div className="flex items-center gap-3">
                 <div className="text-right">
                   <p className="text-sm font-medium flex items-center gap-2">
                     <User className="h-4 w-4" />
-                    {profile.name}
+                    {user.name}
                   </p>
-                  <Badge className={getRoleBadgeColor(profile.role)} variant="secondary">
-                    {profile.role}
+                  <Badge className={getRoleBadgeColor(user.role)} variant="secondary">
+                    {user.role}
                   </Badge>
                 </div>
                 <Button variant="outline" size="sm" onClick={handleSignOut}>

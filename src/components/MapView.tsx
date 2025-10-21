@@ -20,6 +20,7 @@ interface MapViewProps {
   }>;
   onMapClick?: (lat: number, lng: number) => void;
   className?: string;
+  polylines?: Array<{ points: [number, number][], color?: string }>; // optional route lines
 }
 
 const MapView = ({
@@ -28,10 +29,12 @@ const MapView = ({
   markers = [],
   onMapClick,
   className = 'h-[500px] w-full rounded-lg',
+  polylines = [],
 }: MapViewProps) => {
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
+  const polylineLayerRef = useRef<L.LayerGroup | null>(null);
 
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
@@ -47,6 +50,10 @@ const MapView = ({
     // Initialize markers layer
     const markersLayer = L.layerGroup().addTo(map);
     markersLayerRef.current = markersLayer;
+
+    // Initialize polyline layer
+    const polyLayer = L.layerGroup().addTo(map);
+    polylineLayerRef.current = polyLayer;
 
     // Handle map clicks
     if (onMapClick) {
@@ -135,6 +142,16 @@ const MapView = ({
       mapRef.current.setView(markers[0].position, 13);
     }
   }, [markers]);
+
+  // Update polylines
+  useEffect(() => {
+    if (!polylineLayerRef.current) return;
+    polylineLayerRef.current.clearLayers();
+    polylines.forEach(({ points, color }) => {
+      const line = L.polyline(points, { color: color || '#2563eb', weight: 4 });
+      line.addTo(polylineLayerRef.current as L.LayerGroup);
+    });
+  }, [polylines]);
 
   return <div ref={mapContainerRef} className={className} />;
 };

@@ -3,7 +3,8 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { AuthProvider, useAuth } from "@/contexts/MongoAuthContext";
+import { SocketProvider } from "@/contexts/SocketContext";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -14,7 +15,7 @@ import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
 const ProtectedRoute = ({ children, allowedRoles }: { children: React.ReactNode; allowedRoles?: string[] }) => {
-  const { user, profile, loading } = useAuth();
+  const { user, loading } = useAuth();
 
   if (loading) {
     return (
@@ -24,11 +25,11 @@ const ProtectedRoute = ({ children, allowedRoles }: { children: React.ReactNode;
     );
   }
 
-  if (!user || !profile) {
+  if (!user) {
     return <Navigate to="/auth" replace />;
   }
 
-  if (allowedRoles && !allowedRoles.includes(profile.role)) {
+  if (allowedRoles && !allowedRoles.includes(user.role)) {
     return <Navigate to="/" replace />;
   }
 
@@ -36,17 +37,17 @@ const ProtectedRoute = ({ children, allowedRoles }: { children: React.ReactNode;
 };
 
 const AppRoutes = () => {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
 
   return (
     <Routes>
       <Route
         path="/"
         element={
-          user && profile ? (
-            profile.role === 'ADMIN' ? (
+          user ? (
+            user.role === 'ADMIN' ? (
               <Navigate to="/admin" replace />
-            ) : profile.role === 'DRIVER' ? (
+            ) : user.role === 'DRIVER' ? (
               <Navigate to="/driver" replace />
             ) : (
               <Navigate to="/customer" replace />
@@ -91,11 +92,13 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <BrowserRouter>
       <AuthProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <AppRoutes />
-        </TooltipProvider>
+        <SocketProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <AppRoutes />
+          </TooltipProvider>
+        </SocketProvider>
       </AuthProvider>
     </BrowserRouter>
   </QueryClientProvider>

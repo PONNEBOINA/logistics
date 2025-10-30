@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
-import { Truck, MapPin, Navigation, Package, IndianRupee, Key, CheckCircle, Route, Star, Edit } from 'lucide-react';
+import { Truck, MapPin, Navigation, Package, IndianRupee, Key, CheckCircle, Route, Star, Edit, RefreshCcw } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import MapView from '@/components/MapView';
 import RouteMap from '@/components/RouteMap';
@@ -111,6 +111,7 @@ interface Profile {
   // Real-time tracking state
   const [driverLocations, setDriverLocations] = useState<Record<string, { lat: number; lng: number }>>({});
   const [bookingOTPs, setBookingOTPs] = useState<Record<string, string>>({});
+  const [resendingOtp, setResendingOtp] = useState<Record<string, boolean>>({});
 
   // Initialize requested vehicle IDs from bookings data
   useEffect(() => {
@@ -348,6 +349,26 @@ interface Profile {
     }
   };
 
+  const handleResendOtp = async (bookingId: string) => {
+    try {
+      setResendingOtp(prev => ({ ...prev, [bookingId]: true }));
+      await apiPost(`/api/bookings/${bookingId}/resend-otp`, {});
+
+      toast({
+        title: 'OTP resent',
+        description: 'A new OTP has been sent to you and the driver.',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Failed to resend OTP',
+        description: error.message || 'Unable to resend OTP right now.',
+        variant: 'destructive',
+      });
+    } finally {
+      setResendingOtp(prev => ({ ...prev, [bookingId]: false }));
+    }
+  };
+
   // Real-time Socket.IO listeners
   useEffect(() => {
     if (!socket || !user) return;
@@ -366,6 +387,11 @@ interface Profile {
               : booking
           )
         );
+
+        setBookingOTPs(prev => ({
+          ...prev,
+          [otpData.id]: otpData.otp,
+        }));
 
         toast({
           title: 'Driver Found! 🎉',
@@ -518,6 +544,11 @@ interface Profile {
               : booking
           )
         );
+
+        setBookingOTPs(prev => ({
+          ...prev,
+          [otpData.id]: otpData.otp,
+        }));
 
         toast({
           title: 'Driver Found! 🎉',
@@ -869,7 +900,9 @@ interface Profile {
     try {
       setSubmittingFeedback(prev => ({ ...prev, [bookingId]: true }));
 
-      const feedback = await apiPost('/api/feedback', {
+      const feedbackResponse = await apiPost<{ success: boolean; feedback: any }>(
+        '/api/feedback',
+        {
         bookingId,
         customerId: user?.id,
         customerName: user?.name,
@@ -877,9 +910,10 @@ interface Profile {
         driverName: booking.driverName,
         rating,
         comment,
-      });
+      }
+      );
 
-      setBookingFeedbacks(prev => ({ ...prev, [bookingId]: feedback.feedback }));
+      setBookingFeedbacks(prev => ({ ...prev, [bookingId]: feedbackResponse.feedback }));
       setEditingFeedback(prev => ({ ...prev, [bookingId]: false }));
 
       toast({
@@ -914,12 +948,15 @@ interface Profile {
     try {
       setSubmittingFeedback(prev => ({ ...prev, [bookingId]: true }));
 
-      const feedback = await apiPut(`/api/feedback/${bookingId}`, {
+      const feedbackResponse = await apiPut<{ success: boolean; feedback: any }>(
+        `/api/feedback/${bookingId}`,
+        {
         rating,
         comment,
-      });
+      }
+      );
 
-      setBookingFeedbacks(prev => ({ ...prev, [bookingId]: feedback.feedback }));
+      setBookingFeedbacks(prev => ({ ...prev, [bookingId]: feedbackResponse.feedback }));
       setEditingFeedback(prev => ({ ...prev, [bookingId]: false }));
 
       toast({
@@ -1366,6 +1403,21 @@ interface Profile {
                             {otp}
                           </div>
                         </div>
+                        <div className="mt-4 flex justify-end">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleResendOtp(bookingId)}
+                            disabled={!!resendingOtp[bookingId]}
+                          >
+                            {resendingOtp[bookingId] ? 'Resending...' : (
+                              <span className="flex items-center gap-2">
+                                <RefreshCcw className="h-4 w-4" />
+                                Resend OTP
+                              </span>
+                            )}
+                          </Button>
+                        </div>
                       </div>
                     ) : booking.status === 'Booked' ? (
                       <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-200 dark:border-yellow-800 rounded-lg">
@@ -1376,6 +1428,21 @@ interface Profile {
                             <p className="text-xs text-yellow-600 dark:text-yellow-400">
                               OTP will appear here shortly. Refresh if not visible.
                             </p>
+                            <div className="mt-3">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleResendOtp(bookingId)}
+                                disabled={!!resendingOtp[bookingId]}
+                              >
+                                {resendingOtp[bookingId] ? 'Resending...' : (
+                                  <span className="flex items-center gap-2">
+                                    <RefreshCcw className="h-4 w-4" />
+                                    Resend OTP
+                                  </span>
+                                )}
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       </div>

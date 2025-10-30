@@ -400,6 +400,51 @@ router.post('/:id/reached-pickup', async (req, res) => {
   }
 });
 
+// POST /api/bookings/:id/resend-otp - Customer requests a fresh OTP
+router.post('/:id/resend-otp', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const booking = await Booking.findById(id);
+    if (!booking) return res.status(404).json({ error: 'Booking not found' });
+
+    const validStatuses = ['Booked', 'Reached Pickup', 'Waiting for Pickup Confirmation'];
+    if (!validStatuses.includes(booking.status)) {
+      return res.status(400).json({
+        error: 'Cannot resend OTP for this booking status',
+        details: `Current status: ${booking.status}`,
+      });
+    }
+
+    const otp = booking.generatePickupOTP();
+    await booking.save();
+
+    if (req.io) {
+      const otpData = {
+        id: booking._id.toString(),
+        otp,
+        status: booking.status,
+        driverLocation: booking.driverLocation,
+      };
+
+      req.io.to(`customer:${booking.customerId}`).emit('pickup_otp_generated', otpData);
+
+      if (booking.driverId) {
+        req.io.to(`driver:${booking.driverId}`).emit('pickup_otp_generated', otpData);
+      }
+    }
+
+    res.json({
+      success: true,
+      otp,
+      booking,
+      message: 'A new OTP has been generated and shared.',
+    });
+  } catch (err) {
+    res.status(400).json({ error: 'Failed to resend OTP', details: err.message });
+  }
+});
+
 // POST /api/bookings/:id/verify-otp - Verify OTP and start pickup
 router.post('/:id/verify-otp', async (req, res) => {
   try {

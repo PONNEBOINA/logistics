@@ -61,12 +61,16 @@ BookingSchema.methods.generatePickupOTP = function() {
 // Helper method to verify OTP (valid for 30 minutes)
 BookingSchema.methods.verifyPickupOTP = function(enteredOTP) {
   if (!this.pickupOTP || !this.otpGeneratedAt) return false;
-  
+
   const thirtyMinutes = 30 * 60 * 1000;
   const isExpired = Date.now() - this.otpGeneratedAt.getTime() > thirtyMinutes;
-  
+
   if (isExpired) return false;
-  return this.pickupOTP === enteredOTP;
+
+  const storedOtp = this.pickupOTP.toString().trim();
+  const providedOtp = (enteredOTP ?? '').toString().trim();
+
+  return storedOtp === providedOtp;
 };
 
 export default mongoose.model('Booking', BookingSchema);

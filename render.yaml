@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: logistics-backend
+    env: node
+    region: singapore
+    plan: free
+    buildCommand: cd server && npm install
+    startCommand: cd server && node index.js
+    envVars:
+      - key: PORT
+        value: 4001
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false
+      - key: TLS_INSECURE
+        value: true
+      - key: ALLOW_DIRECT_ADMIN_SIGNUP
+        value: false

@@ -322,8 +322,8 @@ router.patch('/:id/generate-otp', async (req, res) => {
 
     if (!booking) return res.status(404).json({ error: 'Booking not found' });
 
-    // Update status to Booked and generate OTP
-    booking.status = 'Booked';
+    // Update status to Reached Pickup and generate OTP
+    booking.status = 'Reached Pickup';
     const otp = booking.generatePickupOTP();
 
     await booking.save();
@@ -458,9 +458,13 @@ router.post('/:id/verify-otp', async (req, res) => {
     const isValid = booking.verifyPickupOTP(otp);
     
     if (!isValid) {
+      const isExpired = booking.otpGeneratedAt && 
+        (Date.now() - new Date(booking.otpGeneratedAt).getTime() > 30 * 60 * 1000);
+      
       return res.status(400).json({ 
         success: false, 
-        error: 'Invalid or expired OTP' 
+        error: isExpired ? 'OTP has expired. Please generate a new one.' : 'Invalid OTP',
+        isExpired
       });
     }
     

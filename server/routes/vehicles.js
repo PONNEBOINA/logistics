@@ -25,11 +25,25 @@ router.get('/active', async (_req, res) => {
       'In Transit'        // Driver delivering
     ];
     
-    // Get all active bookings with vehicle IDs that are actually busy
-    const activeBookings = await Booking.find({
-      status: { $in: activeBookingStatuses },
-      vehicleId: { $exists: true, $ne: null }
-    }).select('vehicleId status');
+    // Get all active bookings with vehicle IDs or numbers that are actually busy
+    const activeBookings = await Booking.aggregate([
+      {
+        $match: {
+          status: { $in: activeBookingStatuses },
+          $or: [
+            { vehicleId: { $exists: true, $ne: null } },
+            { 'vehicle.number': { $exists: true, $ne: null } }
+          ]
+        }
+      },
+      {
+        $project: {
+          vehicleId: 1,
+          'vehicle.number': 1,
+          status: 1
+        }
+      }
+    ]);
     
     console.log('🚛 Active bookings with vehicles:', activeBookings.map(b => ({
       bookingId: b._id,
@@ -38,12 +52,19 @@ router.get('/active', async (_req, res) => {
       vehicleIdType: typeof b.vehicleId
     })));
 
-    // Create a set of busy vehicle IDs (only include truly busy vehicles)
-    const busyVehicleIds = new Set(
-      activeBookings
-        .map(b => b.vehicleId?.toString())
-        .filter(Boolean) // Remove any null/undefined
-    );
+    // Create a set of busy vehicle IDs and numbers (only include truly busy vehicles)
+    const busyVehicleIds = new Set();
+    
+    activeBookings.forEach(booking => {
+      // Add vehicleId if it exists
+      if (booking.vehicleId) {
+        busyVehicleIds.add(booking.vehicleId.toString());
+      }
+      // Add vehicle.number if it exists
+      if (booking.vehicle?.number) {
+        busyVehicleIds.add(booking.vehicle.number);
+      }
+    });
 
     console.log('🔴 Busy vehicle IDs:', Array.from(busyVehicleIds));
     
@@ -57,12 +78,12 @@ router.get('/active', async (_req, res) => {
       active: v.active
     })));
     
-    // Filter out vehicles that are in the busy list
+    // Filter out vehicles that are in the busy list by either ID or number
     const availableVehicles = [];
     
     for (const vehicle of allActiveVehicles) {
       const vehicleIdStr = vehicle._id.toString();
-      const isBusy = busyVehicleIds.has(vehicleIdStr);
+      const isBusy = busyVehicleIds.has(vehicleIdStr) || busyVehicleIds.has(vehicle.number);
       
       if (!isBusy) {
         // Only process vehicles that aren't busy

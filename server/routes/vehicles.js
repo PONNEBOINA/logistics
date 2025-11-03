@@ -17,39 +17,91 @@ router.get('/', async (req, res) => {
 // GET /api/vehicles/active - Get only available vehicles (not currently in active bookings)
 router.get('/active', async (_req, res) => {
   try {
-    // Get all active vehicles
-    const vehicles = await Vehicle.find({ active: true }).sort({ createdAt: -1 });
-    
-    // Get all active bookings (statuses that mean vehicle is busy)
+    // First get all active bookings to find busy vehicles
     const activeBookingStatuses = [
-      'Requested',    // Customer requested, waiting for admin
-      'Pending',      // Admin assigned, waiting for driver
-      'Booked',       // Driver accepted, heading to pickup
-      'Reached Pickup', // Driver at pickup, waiting for OTP
-      'Order Picked Up', // Driver picked up order
-      'In Transit'    // Driver delivering
+      'Booked',           // Driver accepted, heading to pickup
+      'Reached Pickup',   // Driver at pickup, waiting for OTP
+      'Order Picked Up',  // Driver picked up order
+      'In Transit'        // Driver delivering
     ];
     
+    // Get all active bookings with vehicle IDs that are actually busy
     const activeBookings = await Booking.find({
-      status: { $in: activeBookingStatuses }
-    });
+      status: { $in: activeBookingStatuses },
+      vehicleId: { $exists: true, $ne: null }
+    }).select('vehicleId status');
     
-    // Get list of busy vehicle IDs
+    console.log('🚛 Active bookings with vehicles:', activeBookings.map(b => ({
+      bookingId: b._id,
+      vehicleId: b.vehicleId,
+      status: b.status,
+      vehicleIdType: typeof b.vehicleId
+    })));
+
+    // Create a set of busy vehicle IDs (only include truly busy vehicles)
     const busyVehicleIds = new Set(
       activeBookings
-        .filter(booking => booking.vehicleId)
-        .map(booking => booking.vehicleId.toString())
+        .map(b => b.vehicleId?.toString())
+        .filter(Boolean) // Remove any null/undefined
     );
+
+    console.log('🔴 Busy vehicle IDs:', Array.from(busyVehicleIds));
     
-    // Filter out busy vehicles
-    const availableVehicles = vehicles.filter(vehicle => {
-      const vehicleId = vehicle._id.toString();
-      return !busyVehicleIds.has(vehicleId);
-    });
+    // Get all active vehicles
+    const allActiveVehicles = await Vehicle.find({ active: true }).lean();
     
-    console.log(`📊 Total active vehicles: ${vehicles.length}, Busy: ${busyVehicleIds.size}, Available: ${availableVehicles.length}`);
+    console.log('🚗 All active vehicles:', allActiveVehicles.map(v => ({
+      id: v._id,
+      number: v.number,
+      driverId: v.driverId,
+      active: v.active
+    })));
     
-    res.json(availableVehicles);
+    // Filter out vehicles that are in the busy list
+    const availableVehicles = [];
+    
+    for (const vehicle of allActiveVehicles) {
+      const vehicleIdStr = vehicle._id.toString();
+      const isBusy = busyVehicleIds.has(vehicleIdStr);
+      
+      if (!isBusy) {
+        // Only process vehicles that aren't busy
+        try {
+          // If vehicle has a driver, check if driver is active
+          if (vehicle.driverId) {
+            const driver = await mongoose.model('User').findOne(
+              { _id: vehicle.driverId, active: true },
+              { password: 0, __v: 0 }
+            ).lean();
+            
+            if (driver) {
+              availableVehicles.push({
+                ...vehicle,
+                driver: {
+                  _id: driver._id,
+                  name: driver.name,
+                  email: driver.email,
+                  phone: driver.phone
+                }
+              });
+            }
+          } else {
+            // Vehicles without drivers are still available
+            availableVehicles.push(vehicle);
+          }
+        } catch (error) {
+          console.error(`Error processing vehicle ${vehicle._id}:`, error);
+        }
+      } else {
+        console.log(`🚫 Vehicle ${vehicle.number} (${vehicleIdStr}) is busy with status: ` + 
+          activeBookings.find(b => b.vehicleId?.toString() === vehicleIdStr)?.status);
+      }
+    }
+    
+    console.log(`✅ Found ${availableVehicles.length} available vehicles out of ${allActiveVehicles.length} total active vehicles`);
+    
+    // Return available vehicles sorted by creation date (newest first)
+    res.json(availableVehicles.sort((a, b) => b.createdAt - a.createdAt));
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch active vehicles', details: err.message });
   }
